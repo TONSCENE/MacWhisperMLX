@@ -91,8 +91,3 @@ To download the pre-compiled standalone app:
 1. Go to the **[Releases](https://github.com/TONSCENE/MacWhisperMLX/releases)** section of this repository.
 2. Download the `MacWhisperMLX.zip` file.
 3. Extract the ZIP file on your Mac and drag the `MacWhisperMLX.app` to your Applications folder.
-
-*(Note for the repository owner: Drag and drop the `MacWhisperMLX.zip` file into the release assets area during creation as shown below:)*
-
-![GitHub Release Guide](github_release_guide.png)
-
