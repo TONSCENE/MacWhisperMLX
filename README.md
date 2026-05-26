@@ -52,6 +52,8 @@ pip install pyinstaller pillow
 pyinstaller --noconfirm --windowed --name "MacWhisperMLX" \
   --icon "applet.icns" \
   --paths "/Users/chanthana/miniforge3/lib" \
+  --add-binary "/opt/homebrew/bin/ffmpeg:." \
+  --add-binary "/opt/homebrew/bin/ffprobe:." \
   --collect-all mlx \
   --collect-all mlx_whisper \
   --collect-all demucs_mlx \
@@ -90,6 +92,14 @@ To download the pre-compiled standalone app, go to the **[Releases](https://gith
 > 1. คลิกขวา (หรือใช้ 2 นิ้วเคาะบน Trackpad) ที่ตัวแอป **MacWhisperMLX**
 > 2. เลือก **Open** (เปิด)
 > 3. กดปุ่ม **Open** อีกครั้งเพื่อยืนยัน
+>
+> > [!TIP]
+> > **วิธีแก้ผ่าน Terminal (ทางเลือกเพิ่มเติมหากเปิดไม่ได้):**  
+> > เปิดแอป Terminal แล้วรันคำสั่งนี้เพื่อปลดล็อกแอป (สมมติว่าย้ายแอปไปไว้ในโฟลเดอร์ Applications แล้ว):  
+> > ```bash
+> > xattr -cr /Applications/MacWhisperMLX.app
+> > ```
+> > *หรือ พิมพ์ `xattr -cr ` (เว้นวรรค 1 ครั้ง) แล้วลากตัวแอปจาก Finder มาวางใน Terminal แล้วกด Enter*
 
 > [!NOTE]
 > **การใช้งานครั้งแรกสุด**
@@ -112,6 +122,14 @@ Download, extract, and start using it immediately!
 > 1. Right-click (or tap with two fingers on your Trackpad) the **MacWhisperMLX** app icon.
 > 2. Select **Open**.
 > 3. Click **Open** again to confirm.
+>
+> > [!TIP]
+> > **Alternative: Bypassing via Terminal**  
+> > Open your Terminal app and run this command to remove the quarantine flag (assuming the app has been moved to Applications):  
+> > ```bash
+> > xattr -cr /Applications/MacWhisperMLX.app
+> > ```
+> > *Alternatively, type `xattr -cr ` (with a space) and drag-and-drop the app from Finder into the Terminal window, then press Enter.*
 
 > [!NOTE]
 > **First-time Run Setup**
