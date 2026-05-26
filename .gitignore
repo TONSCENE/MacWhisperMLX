@@ -1,0 +1,25 @@
+# PyInstaller build artifacts
+build/
+dist/
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# OS generated files
+.DS_Store
+.localized
+
+# Media files
+*.mp4
+*.wav
+*.mp3
+*.m4a
+*.mov
+*.avi
+*.mkv
+
+# Subtitle and text exports
+*.srt
+*.vtt
+*.txt
