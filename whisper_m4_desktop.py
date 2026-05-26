@@ -148,10 +148,18 @@ class TranscribeWorker(QThread):
             # 3. VAD / VSP Processing
             if self.mode_index in [1, 2]:
                 self.log_signal.emit("🔍 กำลังประมวลผลค้นหาเสียงพูด (Silero VAD)...")
+                
+                # Load Silero VAD locally without internet dependency
+                if getattr(sys, 'frozen', False):
+                    vad_repo_dir = os.path.join(sys._MEIPASS, "silero_vad_local")
+                else:
+                    vad_repo_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "silero_vad_local")
+                
+                self.log_signal.emit(f"📂 โหลด VAD จาก: {vad_repo_dir}")
                 vad_model, utils = torch.hub.load(
-                    repo_or_dir='snakers4/silero-vad',
+                    repo_or_dir=vad_repo_dir,
                     model='silero_vad',
-                    force_reload=False
+                    source='local'
                 )
                 (get_speech_timestamps, _, _, _, _) = utils
 

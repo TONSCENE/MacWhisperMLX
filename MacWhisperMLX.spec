@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = []
+datas = [('silero_vad_local', 'silero_vad_local')]
 binaries = [('/opt/homebrew/bin/ffmpeg', '.'), ('/opt/homebrew/bin/ffprobe', '.')]
 hiddenimports = []
 tmp_ret = collect_all('mlx')
