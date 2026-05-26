@@ -2,8 +2,6 @@
 
 A native macOS desktop application built with PyQt6 and optimized for Apple Silicon (M1/M2/M3/M4) GPUs, offering high-performance offline transcription using MLX Whisper.
 
-![MacWhisperMLX App Icon](mac_whisper_mlx_icon.png)
-
 ## 📱 Application Interface
 
 ![MacWhisperMLX App Screenshot](app_screenshot.png)
