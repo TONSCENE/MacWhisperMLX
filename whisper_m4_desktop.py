@@ -210,26 +210,73 @@ class TranscribeWorker(QThread):
                     self.progress.emit(percent)
                     self.log_signal.emit(f"⏳ แกะคำเสร็จสิ้น: {idx}/{len(speech_timestamps)} ช่วง ({chunk_start_sec:.1f}s -> {chunk_end_sec:.1f}s)")
             else:
-                # Direct Continuous Transcription
+                # Direct Continuous Transcription with chunked progress
                 self.log_signal.emit("🚀 รันถอดเสียงแบบต่อเนื่องโดยไม่เปิด VAD (Whisper MLX)...")
-                result = mlx_whisper.transcribe(
-                    working_audio_file,
-                    path_or_hf_repo=self.model,
-                    language=self.language,
-                    initial_prompt=self.initial_prompt,
-                    condition_on_previous_text=False,
-                    verbose=False,
-                    word_timestamps=self.use_dtw
-                )
-                for segment in result.get('segments', []):
-                    text = segment['text'].strip()
-                    if text:
-                        all_segments.append({
-                            'start': segment['start'],
-                            'end': segment['end'],
-                            'text': text
-                        })
-                self.progress.emit(100)
+
+                total_samples = wav_1d.shape[0]
+                total_duration_sec = total_samples / 16000.0
+                chunk_duration_sec = 30  # ~30 seconds per chunk for progress updates
+                chunk_samples = chunk_duration_sec * 16000
+
+                if total_duration_sec <= chunk_duration_sec:
+                    # Short audio: transcribe in one go
+                    self.log_signal.emit(f"📏 ไฟล์เสียงสั้น ({total_duration_sec:.1f}s) ถอดความทั้งไฟล์ในครั้งเดียว...")
+                    self.progress.emit(10)
+                    result = mlx_whisper.transcribe(
+                        working_audio_file,
+                        path_or_hf_repo=self.model,
+                        language=self.language,
+                        initial_prompt=self.initial_prompt,
+                        condition_on_previous_text=False,
+                        verbose=False,
+                        word_timestamps=self.use_dtw
+                    )
+                    for segment in result.get('segments', []):
+                        text = segment['text'].strip()
+                        if text:
+                            all_segments.append({
+                                'start': segment['start'],
+                                'end': segment['end'],
+                                'text': text
+                            })
+                    self.progress.emit(100)
+                else:
+                    # Long audio: split into chunks and report progress
+                    num_chunks = int(np.ceil(total_samples / chunk_samples))
+                    self.log_signal.emit(f"📏 ไฟล์เสียงยาว {total_duration_sec:.1f}s แบ่งเป็น {num_chunks} ส่วน (ส่วนละ ~{chunk_duration_sec}s) เพื่อแสดงความคืบหน้า...")
+
+                    for chunk_idx in range(num_chunks):
+                        start_sample = int(chunk_idx * chunk_samples)
+                        end_sample = int(min(start_sample + chunk_samples, total_samples))
+                        chunk_start_sec = start_sample / 16000.0
+                        chunk_end_sec = end_sample / 16000.0
+
+                        audio_chunk = wav_1d[start_sample:end_sample].numpy()
+
+                        result = mlx_whisper.transcribe(
+                            audio_chunk,
+                            path_or_hf_repo=self.model,
+                            language=self.language,
+                            initial_prompt=self.initial_prompt,
+                            condition_on_previous_text=False,
+                            verbose=False,
+                            word_timestamps=self.use_dtw
+                        )
+
+                        for segment in result.get('segments', []):
+                            actual_start = chunk_start_sec + segment['start']
+                            actual_end = chunk_start_sec + segment['end']
+                            text = segment['text'].strip()
+                            if text:
+                                all_segments.append({
+                                    'start': actual_start,
+                                    'end': actual_end,
+                                    'text': text
+                                })
+
+                        percent = int(((chunk_idx + 1) / num_chunks) * 100)
+                        self.progress.emit(percent)
+                        self.log_signal.emit(f"⏳ ถอดความเสร็จ: ส่วนที่ {chunk_idx + 1}/{num_chunks} ({chunk_start_sec:.1f}s → {chunk_end_sec:.1f}s) [{percent}%]")
 
             # Cleanup temp files
             for tf in temp_files_to_cleanup:
