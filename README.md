@@ -69,20 +69,50 @@ The resulting `MacWhisperMLX.app` bundle (~1.5 GB) will be located in the `dist/
 
 ---
 
-## ⚠️ Notes for Sharing the Standalone App
+## 📥 How to Download the Standalone App / วิธีดาวน์โหลดแอปใช้งาน
 
-When sharing the standalone `MacWhisperMLX.app` bundle with others:
-1. **Compress it to a ZIP** first (`MacWhisperMLX.zip`) before sending.
-2. Since this app is unsigned, the recipient may need to clear the macOS Gatekeeper quarantine flag. They can do this by running the following command in their Terminal:
-   ```bash
-   xattr -cr /path/to/MacWhisperMLX.app
-   ```
+To download the pre-compiled standalone app, go to the **[Releases](https://github.com/TONSCENE/MacWhisperMLX/releases)** section of this repository and download the `MacWhisperMLX.zip` file.
 
 ---
 
-## 📥 How to Download the Standalone App
+### 🇹🇭 ภาษาไทย (Thai Instructions)
 
-To download the pre-compiled standalone app:
-1. Go to the **[Releases](https://github.com/TONSCENE/MacWhisperMLX/releases)** section of this repository.
-2. Download the `MacWhisperMLX.zip` file.
-3. Extract the ZIP file on your Mac and drag the `MacWhisperMLX.app` to your Applications folder.
+🚀 **MacWhisperMLX (Standalone App)**
+ดาวน์โหลดไปแตกไฟล์แล้วเปิดใช้งานได้ทันที!
+
+> [!WARNING]
+> **รองรับชิป Apple Silicon เท่านั้น**
+> ใช้ได้เฉพาะ Mac ที่เป็นชิป M1, M2, M3, M4 นะครับ (ไม่รองรับเครื่อง Intel)
+
+> [!IMPORTANT]
+> **วิธีเปิดแอปครั้งแรก (แก้ปัญหาติด Gatekeeper บล็อก)**
+> เนื่องจากระบบความปลอดภัยของ macOS ให้ทำตามนี้ในครั้งแรกเพื่อเปิดใช้งานครับ:
+> 1. คลิกขวา (หรือใช้ 2 นิ้วเคาะบน Trackpad) ที่ตัวแอป **MacWhisperMLX**
+> 2. เลือก **Open** (เปิด)
+> 3. กดปุ่ม **Open** อีกครั้งเพื่อยืนยัน
+
+> [!NOTE]
+> **การใช้งานครั้งแรกสุด**
+> ตอนที่สั่งถอดความครั้งแรกสุด ตัวแอปจะมีการดาวน์โหลดโมเดล Whisper จากอินเทอร์เน็ตมาเก็บไว้ในเครื่องก่อน ให้ต่ออินเทอร์เน็ตทิ้งไว้สักครู่ในการรันครั้งแรกครับ (ครั้งต่อไปเปิดใช้งานแบบออฟไลน์ได้เลย)
+
+---
+
+### 🇺🇸 English (English Instructions)
+
+🚀 **MacWhisperMLX (Standalone App)**
+Download, extract, and start using it immediately!
+
+> [!WARNING]
+> **Apple Silicon Only**
+> Compatible only with Apple Silicon Macs (M1, M2, M3, M4 series). Older Intel-based Macs are not supported.
+
+> [!IMPORTANT]
+> **First-time Opening (Bypassing macOS Gatekeeper Block)**
+> Because this is an unsigned application, macOS security may prevent it from opening. To open it the first time:
+> 1. Right-click (or tap with two fingers on your Trackpad) the **MacWhisperMLX** app icon.
+> 2. Select **Open**.
+> 3. Click **Open** again to confirm.
+
+> [!NOTE]
+> **First-time Run Setup**
+> When transcribing for the very first time, the app will download the selected Whisper model from the internet and cache it locally. Please ensure you are connected to the internet during your first transcription. (All subsequent transcriptions can be run completely offline!)
