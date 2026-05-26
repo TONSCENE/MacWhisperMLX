@@ -27,4 +27,5 @@ __pycache__/
 # Unrelated project scripts
 Youtube-download.py
 Youtube-downloader-premium.py
+transcribe.py
 transcribe_backup.py

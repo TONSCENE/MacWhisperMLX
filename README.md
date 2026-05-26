@@ -36,11 +36,6 @@ pip install PyQt6 torch torchaudio sounddevice soundfile mlx-whisper huggingface
 python whisper_m4_desktop.py
 ```
 
-### Run CLI version
-```bash
-python transcribe.py path/to/audio_or_video.mp4
-```
-
 ---
 
 ## 📦 How to Package into a Standalone macOS App (`.app`)
