@@ -12,6 +12,17 @@ if "packaged by" in sys.version:
     elif "|" in sys.version:
         sys.version = sys.version.replace("|", "")
 
+# Add bundled and common paths to system PATH so libraries can find ffmpeg and ffprobe
+extra_paths = ["/opt/homebrew/bin", "/usr/local/bin", "/opt/homebrew/sbin"]
+if getattr(sys, 'frozen', False):
+    extra_paths.insert(0, sys._MEIPASS)
+
+current_path = os.environ.get("PATH", "")
+for p in extra_paths:
+    if p not in current_path:
+        current_path = p + os.pathsep + current_path
+os.environ["PATH"] = current_path
+
 import time
 import argparse
 import subprocess
