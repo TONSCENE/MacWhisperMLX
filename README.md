@@ -4,6 +4,10 @@ A native macOS desktop application built with PyQt6 and optimized for Apple Sili
 
 ![MacWhisperMLX App Icon](mac_whisper_mlx_icon.png)
 
+## 📱 Application Interface
+
+![MacWhisperMLX App Screenshot](app_screenshot.png)
+
 ---
 
 ## 🌟 Key Features
