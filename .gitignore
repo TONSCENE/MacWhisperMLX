@@ -23,3 +23,8 @@ __pycache__/
 *.srt
 *.vtt
 *.txt
+
+# Unrelated project scripts
+Youtube-download.py
+Youtube-downloader-premium.py
+transcribe_backup.py
