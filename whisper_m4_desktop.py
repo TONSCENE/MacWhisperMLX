@@ -41,7 +41,8 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QComboBox, QPushButton, QCheckBox, QLineEdit, QTextEdit,
     QFileDialog, QProgressBar, QTableWidget, QTableWidgetItem,
-    QHeaderView, QMessageBox, QGroupBox, QSplitter, QListWidget
+    QHeaderView, QMessageBox, QGroupBox, QSplitter, QListWidget,
+    QScrollArea, QLayout
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont, QIcon
@@ -326,7 +327,7 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         # Premium Dark Mode Theme Stylesheet (QSS)
         self.setStyleSheet("""
-            QMainWindow {
+            QMainWindow, QScrollArea, #leftWidget {
                 background-color: #1c2128;
             }
             QWidget {
@@ -448,9 +449,16 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(splitter)
 
         # ----------------- LEFT PANEL (Settings) -----------------
+        left_scroll = QScrollArea()
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
         left_widget = QWidget()
+        left_widget.setObjectName("leftWidget")
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(10, 10, 10, 10)
+        left_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         
         # Title Label
         app_title = QLabel("🎙️ MacWhisper MLX")
@@ -460,7 +468,9 @@ class MainWindow(QMainWindow):
 
         # Group 1: Configuration Settings
         config_group = QGroupBox("⚙️ การตั้งค่าประมวลผล (Config Settings)")
+        config_group.setMinimumHeight(450)
         config_layout = QVBoxLayout(config_group)
+        config_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         
         # Model Selection
         config_layout.addWidget(QLabel("📦 โมเดล (Whisper MLX Model):"))
@@ -546,7 +556,9 @@ class MainWindow(QMainWindow):
 
         # Group 2: Recording Panel
         rec_group = QGroupBox("🔴 บันทึกเสียงพูดไมโครโฟน (Voice Recording)")
+        rec_group.setMinimumHeight(110)
         rec_layout = QVBoxLayout(rec_group)
+        rec_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         self.rec_status_lbl = QLabel("สถานะ: พร้อมบันทึก")
         rec_layout.addWidget(self.rec_status_lbl)
         
@@ -559,7 +571,9 @@ class MainWindow(QMainWindow):
 
         # Group 2.5: System Monitor Panel (CPU, RAM, GPU)
         perf_group = QGroupBox("📊 สถานะเครื่อง (System Resources)")
+        perf_group.setMinimumHeight(180)
         perf_layout = QVBoxLayout(perf_group)
+        perf_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         perf_layout.setSpacing(6)
         perf_layout.setContentsMargins(10, 15, 10, 10)
 
@@ -628,10 +642,12 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(QLabel("📝 บันทึกประมวลผล (Console Logs):"))
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
+        self.log_output.setMinimumHeight(150)
         left_layout.addWidget(self.log_output)
 
         left_widget.setLayout(left_layout)
-        splitter.addWidget(left_widget)
+        left_scroll.setWidget(left_widget)
+        splitter.addWidget(left_scroll)
 
         # ----------------- RIGHT PANEL (Editor & Drag/Drop) -----------------
         right_widget = QWidget()
