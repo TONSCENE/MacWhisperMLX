@@ -3,6 +3,8 @@
 
 import os
 import sys
+import re
+import psutil
 
 # Clean up sys.version if it contains Anaconda/Conda packaging info to prevent platform.py parsing crash in frozen app
 if "packaged by" in sys.version:
@@ -39,7 +41,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QComboBox, QPushButton, QCheckBox, QLineEdit, QTextEdit,
     QFileDialog, QProgressBar, QTableWidget, QTableWidgetItem,
-    QHeaderView, QMessageBox, QGroupBox, QSplitter
+    QHeaderView, QMessageBox, QGroupBox, QSplitter, QListWidget
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont, QIcon
@@ -52,7 +54,7 @@ def format_timestamp(seconds: float):
 
 # Custom Drag & Drop Label Widget
 class DragDropWidget(QLabel):
-    file_dropped = pyqtSignal(str)
+    files_dropped = pyqtSignal(list)
 
     def __init__(self):
         super().__init__()
@@ -82,8 +84,8 @@ class DragDropWidget(QLabel):
     def dropEvent(self, event: QDropEvent):
         urls = event.mimeData().urls()
         if urls:
-            file_path = urls[0].toLocalFile()
-            self.file_dropped.emit(file_path)
+            file_paths = [url.toLocalFile() for url in urls]
+            self.files_dropped.emit(file_paths)
 
 # Background worker for transcription pipeline to prevent GUI freezing
 class TranscribeWorker(QThread):
@@ -304,7 +306,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("🎙️ MacWhisper MLX Studio (M4 Optimized)")
         self.setMinimumSize(QSize(1100, 750))
         
-        self.selected_file_path = None
+        self.selected_files = []
+        self.custom_local_model_path = None
         self.segments = []
         self.current_wav_1d = None
         self.available_models = []
@@ -482,6 +485,24 @@ class MainWindow(QMainWindow):
         model_selection_layout.addWidget(self.delete_model_btn, 1)
         config_layout.addLayout(model_selection_layout)
 
+        # Local Model Path Selection Button
+        local_model_layout = QHBoxLayout()
+        self.local_model_btn = QPushButton("📁 เบราว์โมเดลในเครื่อง (Browse Local Model)")
+        self.local_model_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2d333b;
+                color: #adbac7;
+                padding: 5px 10px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #444c56;
+            }
+        """)
+        self.local_model_btn.clicked.connect(self.browse_local_model)
+        local_model_layout.addWidget(self.local_model_btn)
+        config_layout.addLayout(local_model_layout)
+
         # Language Selection
         config_layout.addWidget(QLabel("🌐 ภาษาเสียงพูด (Language):"))
         self.lang_combo = QComboBox()
@@ -536,6 +557,67 @@ class MainWindow(QMainWindow):
         
         left_layout.addWidget(rec_group)
 
+        # Group 2.5: System Monitor Panel (CPU, RAM, GPU)
+        perf_group = QGroupBox("📊 สถานะเครื่อง (System Resources)")
+        perf_layout = QVBoxLayout(perf_group)
+        perf_layout.setSpacing(6)
+        perf_layout.setContentsMargins(10, 15, 10, 10)
+
+        # CPU Layout
+        cpu_label_layout = QHBoxLayout()
+        cpu_title = QLabel("💻 CPU Usage:")
+        self.cpu_val_lbl = QLabel("0%")
+        self.cpu_val_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.cpu_val_lbl.setStyleSheet("font-weight: bold; color: #57ab5a;")
+        cpu_label_layout.addWidget(cpu_title)
+        cpu_label_layout.addWidget(self.cpu_val_lbl)
+        perf_layout.addLayout(cpu_label_layout)
+        
+        self.cpu_bar = QProgressBar()
+        self.cpu_bar.setFixedHeight(8)
+        self.cpu_bar.setTextVisible(False)
+        self.cpu_bar.setStyleSheet("QProgressBar::chunk { background-color: #57ab5a; border-radius: 3px; }")
+        perf_layout.addWidget(self.cpu_bar)
+
+        # RAM Layout
+        ram_label_layout = QHBoxLayout()
+        ram_title = QLabel("🧠 Unified Memory (RAM):")
+        self.ram_val_lbl = QLabel("0.0 GB / 0.0 GB (0%)")
+        self.ram_val_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.ram_val_lbl.setStyleSheet("font-weight: bold; color: #f28b26;")
+        ram_label_layout.addWidget(ram_title)
+        ram_label_layout.addWidget(self.ram_val_lbl)
+        perf_layout.addLayout(ram_label_layout)
+        
+        self.ram_bar = QProgressBar()
+        self.ram_bar.setFixedHeight(8)
+        self.ram_bar.setTextVisible(False)
+        self.ram_bar.setStyleSheet("QProgressBar::chunk { background-color: #f28b26; border-radius: 3px; }")
+        perf_layout.addWidget(self.ram_bar)
+
+        # GPU Layout
+        gpu_label_layout = QHBoxLayout()
+        gpu_title = QLabel("🎮 Apple Silicon GPU (Metal):")
+        self.gpu_val_lbl = QLabel("0%")
+        self.gpu_val_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.gpu_val_lbl.setStyleSheet("font-weight: bold; color: #b359f4;")
+        gpu_label_layout.addWidget(gpu_title)
+        gpu_label_layout.addWidget(self.gpu_val_lbl)
+        perf_layout.addLayout(gpu_label_layout)
+        
+        self.gpu_bar = QProgressBar()
+        self.gpu_bar.setFixedHeight(8)
+        self.gpu_bar.setTextVisible(False)
+        self.gpu_bar.setStyleSheet("QProgressBar::chunk { background-color: #b359f4; border-radius: 3px; }")
+        perf_layout.addWidget(self.gpu_bar)
+
+        left_layout.addWidget(perf_group)
+
+        # Performance monitoring timer
+        self.perf_timer = QTimer(self)
+        self.perf_timer.timeout.connect(self.update_perf_stats)
+        self.perf_timer.start(1000)
+
         # Group 3: Process Button
         self.transcribe_btn = QPushButton("🚀 เริ่มถอดเสียง (Start Transcribing)")
         self.transcribe_btn.setMinimumHeight(45)
@@ -558,7 +640,7 @@ class MainWindow(QMainWindow):
 
         # Drag and Drop Widget
         self.drop_widget = DragDropWidget()
-        self.drop_widget.file_dropped.connect(self.handle_file_dropped)
+        self.drop_widget.files_dropped.connect(self.handle_files_dropped)
         right_layout.addWidget(self.drop_widget)
 
         # Current File Indicator
@@ -568,8 +650,33 @@ class MainWindow(QMainWindow):
 
         # Select file manually button
         select_file_btn = QPushButton("📁 เลือกไฟล์จากคอมพิวเตอร์ (Open Audio/Video File)")
-        select_file_btn.clicked.connect(self.browse_file)
+        select_file_btn.clicked.connect(self.browse_files)
         right_layout.addWidget(select_file_btn)
+
+        # Queue list for Batch processing
+        right_layout.addWidget(QLabel("📋 คิวประมวลผล (File Queue):"))
+        self.queue_list = QListWidget()
+        self.queue_list.setMaximumHeight(85)
+        right_layout.addWidget(self.queue_list)
+
+        queue_ctrl_layout = QHBoxLayout()
+        self.clear_queue_btn = QPushButton("❌ ล้างคิว (Clear Queue)")
+        self.clear_queue_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2d333b;
+                color: #adbac7;
+                padding: 4px 8px;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background-color: #da3633;
+                color: white;
+            }
+        """)
+        self.clear_queue_btn.clicked.connect(self.clear_queue)
+        queue_ctrl_layout.addWidget(self.clear_queue_btn)
+        queue_ctrl_layout.addStretch()
+        right_layout.addLayout(queue_ctrl_layout)
 
         # Progress Bar
         self.progress_bar = QProgressBar()
@@ -605,6 +712,43 @@ class MainWindow(QMainWindow):
         # Adjust initial sizes (Left Panel 35%, Right Panel 65%)
         splitter.setSizes([350, 750])
 
+    def update_perf_stats(self):
+        try:
+            # 1. CPU Usage
+            cpu_percent = psutil.cpu_percent(interval=None)
+            self.cpu_bar.setValue(int(cpu_percent))
+            self.cpu_val_lbl.setText(f"{cpu_percent:.1f}%")
+
+            # 2. RAM Usage
+            mem = psutil.virtual_memory()
+            total_gb = mem.total / (1024**3)
+            used_gb = mem.used / (1024**3)
+            self.ram_bar.setValue(int(mem.percent))
+            self.ram_val_lbl.setText(f"{used_gb:.1f} GB / {total_gb:.1f} GB ({mem.percent:.0f}%)")
+
+            # 3. GPU (Apple Silicon AGX) Usage
+            gpu_percent = self.get_apple_gpu_usage()
+            self.gpu_bar.setValue(int(gpu_percent))
+            self.gpu_val_lbl.setText(f"{gpu_percent}%")
+        except Exception:
+            pass
+
+    def get_apple_gpu_usage(self):
+        try:
+            # Run ioreg to get AGXAccelerator performance statistics (non-sudo)
+            cmd = ["ioreg", "-r", "-c", "AGXAccelerator", "-d", "3"]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=0.8)
+            if res.returncode == 0:
+                match = re.search(r'"PerformanceStatistics"\s*=\s*\{(.*?)\}', res.stdout)
+                if match:
+                    stats_str = match.group(1)
+                    util_match = re.search(r'"Device Utilization %"=(\d+)', stats_str)
+                    if util_match:
+                        return int(util_match.group(1))
+        except Exception:
+            pass
+        return 0
+
     def load_models(self):
         if not self.available_models:
             self.log_output.append("🔍 กำลังดาวน์โหลดโครงสร้างโมเดลจาก Hugging Face Collection...")
@@ -631,6 +775,10 @@ class MainWindow(QMainWindow):
         
         current_selected = self.model_combo.currentData()
         self.model_combo.clear()
+
+        # Add custom local model if available
+        if self.custom_local_model_path:
+            self.model_combo.addItem(f"📁 [Local] {os.path.basename(self.custom_local_model_path)}", self.custom_local_model_path)
         
         for model_id in self.available_models:
             repo_folder = "models--" + model_id.replace("/", "--")
@@ -653,7 +801,10 @@ class MainWindow(QMainWindow):
                 
             self.model_combo.addItem(display_name, model_id)
             
-        if current_selected:
+        # Restore selection or select custom local model if just added
+        if self.custom_local_model_path and not current_selected:
+            self.model_combo.setCurrentIndex(0)
+        elif current_selected:
             idx = self.model_combo.findData(current_selected)
             if idx >= 0:
                 self.model_combo.setCurrentIndex(idx)
@@ -706,16 +857,46 @@ class MainWindow(QMainWindow):
                     f"ไม่สามารถลบโมเดลได้:\n{e}"
                 )
 
-    def handle_file_dropped(self, path):
-        self.selected_file_path = path
-        self.file_label.setText(f"📂 เลือกไฟล์แล้ว: {os.path.basename(path)}")
-        self.log_output.append(f"📂 โหลดไฟล์ด้วย Drag & Drop สำเร็จ: {path}")
+    def handle_files_dropped(self, paths):
+        for path in paths:
+            if os.path.isfile(path):
+                if path not in self.selected_files:
+                    self.selected_files.append(path)
+                    self.log_output.append(f"📂 เพิ่มไฟล์เข้าคิว: {path}")
+        self.update_queue_ui()
 
-    def browse_file(self):
+    def browse_files(self):
         file_filter = "Media Files (*.mp4 *.wav *.mp3 *.m4a *.mov *.avi *.mkv);;All Files (*)"
-        path, _ = QFileDialog.getOpenFileName(self, "เลือกไฟล์เสียงหรือวิดีโอ", "", file_filter)
-        if path:
-            self.handle_file_dropped(path)
+        paths, _ = QFileDialog.getOpenFileNames(self, "เลือกไฟล์เสียงหรือวิดีโอ", "", file_filter)
+        if paths:
+            self.handle_files_dropped(paths)
+
+    def clear_queue(self):
+        self.selected_files = []
+        self.update_queue_ui()
+        self.log_output.append("🧹 ล้างคิวไฟล์ทั้งหมดเรียบร้อยแล้ว")
+
+    def update_queue_ui(self):
+        self.queue_list.clear()
+        for idx, path in enumerate(self.selected_files):
+            self.queue_list.addItem(f"{idx + 1}. {os.path.basename(path)}")
+            
+        if self.selected_files:
+            self.file_label.setText(f"📂 มีไฟล์ในคิว: {len(self.selected_files)} ไฟล์ (พร้อมประมวลผล)")
+        else:
+            self.file_label.setText("📂 ยังไม่ได้เลือกไฟล์ หรือบันทึกเสียง")
+
+    def browse_local_model(self):
+        dir_path = QFileDialog.getExistingDirectory(self, "เลือกโฟลเดอร์โมเดล Whisper MLX (ที่มีไฟล์ weights.npz หรือ config.json)")
+        if dir_path:
+            config_path = os.path.join(dir_path, "config.json")
+            if not os.path.exists(config_path):
+                QMessageBox.warning(self, "โมเดลไม่ถูกต้อง", "โฟลเดอร์ที่เลือกไม่มีไฟล์ config.json ของ Whisper MLX")
+                return
+            
+            self.custom_local_model_path = dir_path
+            self.log_output.append(f"📂 โหลดโมเดลในเครื่องสำเร็จ: {dir_path}")
+            self.load_models()
 
     # Microphone Recording methods
     def toggle_recording(self):
@@ -777,21 +958,53 @@ class MainWindow(QMainWindow):
         if self.recorded_data:
             audio_arr = np.concatenate(self.recorded_data, axis=0)
             sf.write(self.temp_rec_path, audio_arr, 16000, format='WAV')
-            self.selected_file_path = self.temp_rec_path
-            self.file_label.setText(f"📂 เลือกไฟล์เสียงบันทึกแล้ว ({self.rec_seconds} วินาที)")
+            if self.temp_rec_path not in self.selected_files:
+                self.selected_files.append(self.temp_rec_path)
+            self.update_queue_ui()
             self.rec_status_lbl.setText("สถานะ: โหลดเสียงเสร็จเรียบร้อย")
-            self.log_output.append(f"✅ บันทึกและบันทึกเสียงเป็นไฟล์ชั่วคราวสำเร็จ: {self.temp_rec_path}")
+            self.log_output.append(f"✅ บันทึกเสียงเก็บเข้าคิวชั่วคราวสำเร็จ: {self.temp_rec_path}")
         else:
             self.rec_status_lbl.setText("สถานะ: พร้อมบันทึก")
 
     def start_transcription(self):
-        if not self.selected_file_path or not os.path.exists(self.selected_file_path):
-            QMessageBox.warning(self, "ข้อผิดพลาด", "กรุณาเลือกไฟล์เสียง/วิดีโอ หรืออัดเสียงพูดก่อนเริ่มถอดความ")
+        if not self.selected_files:
+            QMessageBox.warning(self, "ข้อผิดพลาด", "กรุณาเลือกไฟล์เสียง/วิดีโอ หรืออัดเสียงพูดเพื่อเพิ่มเข้าคิวก่อนเริ่มถอดความ")
             return
 
-        model = self.model_combo.currentData()
+        # Disable all UI input during processing
+        self.transcribe_btn.setEnabled(False)
+        self.local_model_btn.setEnabled(False)
+        self.delete_model_btn.setEnabled(False)
+        self.record_btn.setEnabled(False)
+        self.clear_queue_btn.setEnabled(False)
+        self.model_combo.setEnabled(False)
+        self.lang_combo.setEnabled(False)
+        self.demucs_cb.setEnabled(False)
+        self.vad_combo.setEnabled(False)
+        self.dtw_cb.setEnabled(False)
+        self.prompt_input.setEnabled(False)
 
-        # Languages mapping
+        self.current_queue_index = 0
+        self.log_output.clear()
+        self.log_output.append(f"📋 เริ่มการถอดความแบบกลุ่ม (Batch Transcription) ทั้งหมด {len(self.selected_files)} ไฟล์...")
+        
+        self.run_next_in_queue()
+
+    def run_next_in_queue(self):
+        if self.current_queue_index >= len(self.selected_files):
+            self.log_output.append("\n🎉 [Batch Finished] ถอดความเสร็จสิ้นครบถ้วนทุกไฟล์ในคิวแล้ว!")
+            self.progress_bar.setValue(100)
+            self.restore_ui_after_transcription()
+            return
+
+        file_path = self.selected_files[self.current_queue_index]
+        self.current_processed_file = file_path
+        self.log_output.append(f"\n⚡ [{self.current_queue_index + 1}/{len(self.selected_files)}] กำลังประมวลผลไฟล์: {os.path.basename(file_path)}")
+        
+        # Highlight current row
+        self.queue_list.setCurrentRow(self.current_queue_index)
+
+        model = self.model_combo.currentData()
         lang_map = ['ja', 'ko', 'th', 'en', None]
         language = lang_map[self.lang_combo.currentIndex()]
 
@@ -800,17 +1013,14 @@ class MainWindow(QMainWindow):
         use_dtw = self.dtw_cb.isChecked()
         initial_prompt = self.prompt_input.text().strip()
 
-        # Automatic context Prompt for Korean Amazing Saturday
         if not initial_prompt and language == 'ko':
             initial_prompt = "놀라운 토요일, 놀토, 받아쓰기, 받쓰, 신동엽, 붐, 문세윤, 박나래, 한해, 키, 태연, 피오, 넉살, 김동현, 입짧은햇님."
 
-        self.transcribe_btn.setEnabled(False)
         self.progress_bar.setValue(0)
-        self.log_output.clear()
 
         # Worker initialization
         self.worker = TranscribeWorker(
-            file_path=self.selected_file_path,
+            file_path=file_path,
             model=model,
             language=language,
             use_demucs=use_demucs,
@@ -822,35 +1032,69 @@ class MainWindow(QMainWindow):
         self.worker.progress.connect(self.progress_bar.setValue)
         self.worker.error.connect(self.handle_transcribe_error)
         self.worker.finished.connect(self.handle_transcribe_finished)
-        self.worker.setStackSize(8 * 1024 * 1024)  # 8MB Stack size to prevent MLX recursion crash
+        self.worker.setStackSize(8 * 1024 * 1024)
         self.worker.start()
 
     def handle_transcribe_error(self, err_msg):
-        self.log_output.append(f"❌ เกิดข้อผิดพลาดร้ายแรง: {err_msg}")
-        QMessageBox.critical(self, "ข้อผิดพลาด", f"กระบวนการถอดความล้มเหลว:\n{err_msg}")
-        self.transcribe_btn.setEnabled(True)
+        file_path = self.selected_files[self.current_queue_index]
+        self.log_output.append(f"❌ [{self.current_queue_index + 1}/{len(self.selected_files)}] เกิดข้อผิดพลาดกับไฟล์ {os.path.basename(file_path)}: {err_msg}")
+        
+        self.current_queue_index += 1
+        self.run_next_in_queue()
 
     def handle_transcribe_finished(self, segments, wav_1d, elapsed_time):
         self.segments = segments
         self.current_wav_1d = wav_1d
-        self.transcribe_btn.setEnabled(True)
         self.progress_bar.setValue(100)
         
-        self.log_output.append(f"\n🎉 ถอดความเสร็จเรียบร้อยแล้วใน {elapsed_time:.2f} วินาที!")
-        self.log_output.append(f"พบคำบรรยายทั้งหมด {len(segments)} ช่วง")
-        
-        # Refresh model indicators in case a new model was downloaded during transcription
-        self.load_models()
+        file_path = self.selected_files[self.current_queue_index]
+        filename = os.path.basename(file_path)
+        self.log_output.append(f"🎉 เสร็จสิ้น {filename} ใน {elapsed_time:.2f} วินาที (พบคำบรรยาย {len(segments)} ช่วง)")
 
+        # Auto-save files
+        self.auto_save_results(file_path, segments)
+        
         # Load segments into the table
+        self.load_segments_into_table(segments)
+
+        self.current_queue_index += 1
+        self.run_next_in_queue()
+
+    def auto_save_results(self, file_path, segments):
+        try:
+            base, _ = os.path.splitext(file_path)
+            srt_path = base + ".srt"
+            txt_path = base + ".txt"
+
+            # Save SRT
+            with open(srt_path, "w", encoding="utf-8") as f:
+                for idx, seg in enumerate(segments):
+                    start_str = format_timestamp(seg['start'])
+                    end_str = format_timestamp(seg['end'])
+                    f.write(f"{idx + 1}\n{start_str} --> {end_str}\n{seg['text']}\n\n")
+
+            # Save TXT
+            with open(txt_path, "w", encoding="utf-8") as f:
+                for seg in segments:
+                    f.write(f"{seg['text']}\n")
+
+            self.log_output.append(f"💾 บันทึกไฟล์อัตโนมัติสำเร็จ:\n   👉 SRT: {srt_path}\n   👉 TXT: {txt_path}")
+        except Exception as e:
+            self.log_output.append(f"⚠️ ไม่สามารถบันทึกไฟล์อัตโนมัติได้: {e}")
+
+    def load_segments_into_table(self, segments):
         self.sub_table.setRowCount(0)
         self.sub_table.setRowCount(len(segments))
         
+        try:
+            self.sub_table.itemChanged.disconnect(self.sync_table_edits)
+        except Exception:
+            pass
+            
         for idx, seg in enumerate(segments):
             start_str = format_timestamp(seg['start'])
             end_str = format_timestamp(seg['end'])
             
-            # Setup cells
             item_no = QTableWidgetItem(str(idx + 1))
             item_no.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
             
@@ -868,11 +1112,24 @@ class MainWindow(QMainWindow):
             self.sub_table.setItem(idx, 2, item_end)
             self.sub_table.setItem(idx, 3, item_text)
             
-        # Bind item changed logic to sync table edits with in-memory segments
         self.sub_table.itemChanged.connect(self.sync_table_edits)
+
+    def restore_ui_after_transcription(self):
+        self.transcribe_btn.setEnabled(True)
+        self.local_model_btn.setEnabled(True)
+        self.delete_model_btn.setEnabled(True)
+        self.record_btn.setEnabled(True)
+        self.clear_queue_btn.setEnabled(True)
+        self.model_combo.setEnabled(True)
+        self.lang_combo.setEnabled(True)
+        self.demucs_cb.setEnabled(True)
+        self.vad_combo.setEnabled(True)
+        self.dtw_cb.setEnabled(True)
+        self.prompt_input.setEnabled(True)
         
         self.export_srt_btn.setEnabled(True)
         self.export_txt_btn.setEnabled(True)
+        self.load_models()
 
     def sync_table_edits(self, item):
         row = item.row()
@@ -900,7 +1157,10 @@ class MainWindow(QMainWindow):
         if not self.segments:
             return
 
-        default_name = os.path.splitext(os.path.basename(self.selected_file_path))[0]
+        file_path = getattr(self, "current_processed_file", None)
+        if not file_path and self.selected_files:
+            file_path = self.selected_files[0]
+        default_name = os.path.splitext(os.path.basename(file_path))[0] if file_path else "transcript"
         if format_type == "srt":
             file_filter = "SubRip Subtitles (*.srt)"
             extension = ".srt"
