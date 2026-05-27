@@ -4,6 +4,7 @@
 import os
 import sys
 import re
+import multiprocessing
 import psutil
 
 # Clean up sys.version if it contains Anaconda/Conda packaging info to prevent platform.py parsing crash in frozen app
@@ -1214,6 +1215,12 @@ class MainWindow(QMainWindow):
         event.accept()
 
 def main():
+    multiprocessing.freeze_support()
+    if sys.platform == 'darwin':
+        try:
+            multiprocessing.set_start_method('spawn')
+        except RuntimeError:
+            pass
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
