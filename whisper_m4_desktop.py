@@ -169,17 +169,18 @@ class TranscribeWorker(QThread):
                 if self.mode_index == 1:
                     min_speech_duration_ms = 250
                     min_silence_duration_ms = 700
-                    speech_pad_ms = 50
-                    self.log_signal.emit("⚙️ โหมด VAD มาตรฐาน (min_silence = 700ms)")
+                    speech_pad_ms = 250
+                    self.log_signal.emit("⚙️ โหมด VAD มาตรฐาน (threshold = 0.4, min_silence = 700ms, speech_pad = 250ms)")
                 else:
                     min_speech_duration_ms = 250
                     min_silence_duration_ms = 300
                     speech_pad_ms = 50
-                    self.log_signal.emit("⚙️ โหมด VSP (min_speech = 250ms, min_silence = 300ms, speech_pad = 50ms)")
+                    self.log_signal.emit("⚙️ โหมด VSP (threshold = 0.4, min_speech = 250ms, min_silence = 300ms, speech_pad = 50ms)")
 
                 speech_timestamps = get_speech_timestamps(
                     wav_1d,
                     vad_model,
+                    threshold=0.4,
                     sampling_rate=16000,
                     min_speech_duration_ms=min_speech_duration_ms,
                     min_silence_duration_ms=min_silence_duration_ms,
