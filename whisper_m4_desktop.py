@@ -40,6 +40,13 @@ import tempfile
 import numpy as np
 import torch
 import torchaudio
+
+# Compatibility patch for speechbrain/pyannote loading legacy torchaudio functions in torchaudio 2.x
+if not hasattr(torchaudio, "set_audio_backend"):
+    torchaudio.set_audio_backend = lambda *args, **kwargs: None
+if not hasattr(torchaudio, "list_audio_backends"):
+    torchaudio.list_audio_backends = lambda *args, **kwargs: ["soundfile"]
+
 import sounddevice as sd
 import soundfile as sf
 import mlx_whisper
