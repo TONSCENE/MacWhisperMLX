@@ -38,6 +38,21 @@ import argparse
 import subprocess
 import tempfile
 import numpy as np
+
+# Backwards compatibility patches for NumPy 2.0+ legacy names removed
+if not hasattr(np, "NaN"):
+    np.NaN = np.nan
+if not hasattr(np, "Infinity"):
+    np.Infinity = np.inf
+if not hasattr(np, "infty"):
+    np.infty = np.inf
+if not hasattr(np, "float"):
+    np.float = float
+if not hasattr(np, "int"):
+    np.int = int
+if not hasattr(np, "bool"):
+    np.bool = bool
+
 import torch
 import torchaudio
 
