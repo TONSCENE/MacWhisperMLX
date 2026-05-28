@@ -122,6 +122,30 @@ class TranscribeWorker(QThread):
             working_audio_file = self.file_path
             temp_files_to_cleanup = []
 
+            # Pre-convert input file to a standard WAV format to prevent OSStatus pck? errors in frozen app
+            self.log_signal.emit("🔄 กำลังแปลงไฟล์สื่อเป็น WAV (PCM 16-bit 44100Hz Stereo) ด้วย FFmpeg...")
+            try:
+                temp_wav_fh, temp_wav_path = tempfile.mkstemp(suffix="_input.wav")
+                os.close(temp_wav_fh)
+                
+                cmd = [
+                    "ffmpeg", "-y",
+                    "-i", self.file_path,
+                    "-acodec", "pcm_s16le",
+                    "-ar", "44100",
+                    "-ac", "2",
+                    temp_wav_path
+                ]
+                
+                subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                
+                working_audio_file = temp_wav_path
+                temp_files_to_cleanup.append(temp_wav_path)
+                self.log_signal.emit("✅ แปลงไฟล์สื่อเป็น WAV สำเร็จ! (เพื่อป้องกันข้อผิดพลาดในการถอดรหัสเสียง)")
+            except Exception as ffmpeg_err:
+                self.log_signal.emit(f"⚠️ แปลงไฟล์ WAV ไม่สำเร็จ ({ffmpeg_err}) จะลองใช้ไฟล์ต้นฉบับแทน...")
+                working_audio_file = self.file_path
+
             # 1. Demucs Vocal Separation
             if self.use_demucs:
                 self.log_signal.emit("🎵 รัน Demucs แยกเสียงคนพูดออกจากเสียงดนตรีประกอบ...")
