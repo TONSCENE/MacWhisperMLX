@@ -52,7 +52,7 @@ from PyQt6.QtWidgets import (
     QHeaderView, QMessageBox, QGroupBox, QSplitter, QListWidget,
     QScrollArea, QLayout
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize, QSettings
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont, QIcon
 
 # Helper to format timestamps to SRT format
@@ -103,7 +103,7 @@ class TranscribeWorker(QThread):
     finished = pyqtSignal(list, torch.Tensor, float)  # segments, audio_tensor, elapsed_time
     error = pyqtSignal(str)
 
-    def __init__(self, file_path, model, language, use_demucs, mode_index, use_dtw, initial_prompt):
+    def __init__(self, file_path, model, language, use_demucs, mode_index, use_dtw, initial_prompt, use_diarization=False, hf_token=""):
         super().__init__()
         self.file_path = file_path
         self.model = model
@@ -112,6 +112,8 @@ class TranscribeWorker(QThread):
         self.mode_index = mode_index
         self.use_dtw = use_dtw
         self.initial_prompt = initial_prompt
+        self.use_diarization = use_diarization
+        self.hf_token = hf_token
 
     def run(self):
         try:
@@ -141,6 +143,45 @@ class TranscribeWorker(QThread):
                 except Exception as e:
                     self.log_signal.emit(f"⚠️ แยกเสียงพูดไม่สำเร็จ ({e}) จะใช้ไฟล์เสียงต้นฉบับแทน")
                     working_audio_file = self.file_path
+
+            # 1.5. Pyannote Speaker Diarization
+            diarization_list = []
+            if self.use_diarization:
+                self.log_signal.emit("🗣️ เริ่มการวิเคราะห์แยกผู้พูด (Pyannote Speaker Diarization)...")
+                try:
+                    from pyannote.audio import Pipeline
+                    token = self.hf_token.strip() if self.hf_token else None
+                    if not token:
+                        token = True
+                    
+                    self.log_signal.emit("   👉 กำลังโหลดโมเดล Pyannote (pyannote/speaker-diarization-3.1)...")
+                    pipeline = Pipeline.from_pretrained(
+                        "pyannote/speaker-diarization-3.1",
+                        use_auth_token=token
+                    )
+                    
+                    try:
+                        if torch.backends.mps.is_available():
+                            self.log_signal.emit("   👉 ใช้ GPU/Metal (MPS) สำหรับแยกผู้พูด...")
+                            pipeline.to(torch.device("mps"))
+                        else:
+                            pipeline.to(torch.device("cpu"))
+                    except Exception as dev_err:
+                        self.log_signal.emit(f"   ⚠️ ไม่สามารถรันบน MPS ได้ ({dev_err}) ย้ายไปรันบน CPU...")
+                        pipeline.to(torch.device("cpu"))
+                    
+                    self.log_signal.emit("   👉 กำลังประมวลผลแยกผู้พูด...")
+                    diarization = pipeline(working_audio_file)
+                    
+                    for turn, _, speaker in diarization.itertracks(yield_label=True):
+                        diarization_list.append({
+                            'start': turn.start,
+                            'end': turn.end,
+                            'speaker': speaker
+                        })
+                    self.log_signal.emit(f"✅ แยกผู้พูดสำเร็จ! ตรวจพบผู้พูด {len(set(d['speaker'] for d in diarization_list))} คน")
+                except Exception as diar_err:
+                    self.log_signal.emit(f"⚠️ แยกผู้พูดไม่สำเร็จ ({diar_err}) จะถอดความตามปกติโดยไม่แยกคนพูด")
 
             # 2. Load and Resample Audio
             self.log_signal.emit("🎙️ โหลดไฟล์เสียงและแปลงอัตราแซมเปิลเป็น 16000Hz Mono...")
@@ -297,6 +338,37 @@ class TranscribeWorker(QThread):
                         percent = int(((chunk_idx + 1) / num_chunks) * 100)
                         self.progress.emit(percent)
                         self.log_signal.emit(f"⏳ ถอดความเสร็จ: ส่วนที่ {chunk_idx + 1}/{num_chunks} ({chunk_start_sec:.1f}s → {chunk_end_sec:.1f}s) [{percent}%]")
+
+            # 4. Match speaker labels if diarization succeeded
+            if diarization_list:
+                self.log_signal.emit("🔗 กำลังจับคู่ผู้พูดกับช่วงข้อความ...")
+                for seg in all_segments:
+                    seg_start = seg['start']
+                    seg_end = seg['end']
+                    
+                    best_speaker = None
+                    max_overlap = 0.0
+                    for d in diarization_list:
+                        overlap_start = max(seg_start, d['start'])
+                        overlap_end = min(seg_end, d['end'])
+                        overlap = max(0.0, overlap_end - overlap_start)
+                        if overlap > max_overlap:
+                            max_overlap = overlap
+                            best_speaker = d['speaker']
+                            
+                    if best_speaker:
+                        # Translate SPEAKER_00 -> Speaker 1
+                        if best_speaker.startswith("SPEAKER_"):
+                            try:
+                                spk_id = int(best_speaker.split("_")[1]) + 1
+                                display_speaker = f"Speaker {spk_id}"
+                            except Exception:
+                                display_speaker = best_speaker
+                        else:
+                            display_speaker = best_speaker
+                        
+                        seg['text'] = f"[{display_speaker}]: {seg['text']}"
+                self.log_signal.emit("✅ จับคู่ผู้พูดเสร็จสิ้น!")
 
             # Cleanup temp files
             for tf in temp_files_to_cleanup:
@@ -561,6 +633,20 @@ class MainWindow(QMainWindow):
         self.prompt_input.setPlaceholderText("ใส่คำเฉพาะ หรือชื่อบุคคลเพื่อให้ถอดรหัสได้ถูกต้องขึ้น...")
         config_layout.addWidget(self.prompt_input)
 
+        # Pyannote Speaker Diarization
+        self.diarization_cb = QCheckBox("🗣️ แยกคนพูด (Pyannote Speaker Diarization)")
+        self.diarization_cb.setChecked(False)
+        config_layout.addWidget(self.diarization_cb)
+
+        self.hf_token_lbl = QLabel("🔑 Hugging Face API Token:")
+        self.hf_token_input = QLineEdit()
+        self.hf_token_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.hf_token_input.setPlaceholderText("ใส่ HF Token (หากไม่ระบุจะตรวจหาจาก Cache)...")
+        config_layout.addWidget(self.hf_token_lbl)
+        config_layout.addWidget(self.hf_token_input)
+
+        self.diarization_cb.toggled.connect(self.toggle_diarization_fields)
+
         left_layout.addWidget(config_group)
 
         # Group 2: Recording Panel
@@ -736,6 +822,19 @@ class MainWindow(QMainWindow):
         
         # Adjust initial sizes (Left Panel 35%, Right Panel 65%)
         splitter.setSizes([350, 750])
+
+        # Load settings via QSettings
+        self.settings = QSettings("MacWhisperMLX", "Studio")
+        saved_token = self.settings.value("hf_token", "")
+        saved_diarize = self.settings.value("use_diarization", "false") == "true"
+        
+        self.hf_token_input.setText(saved_token)
+        self.diarization_cb.setChecked(saved_diarize)
+        self.toggle_diarization_fields(saved_diarize)
+
+    def toggle_diarization_fields(self, checked):
+        self.hf_token_lbl.setEnabled(checked)
+        self.hf_token_input.setEnabled(checked)
 
     def update_perf_stats(self):
         try:
@@ -996,6 +1095,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "ข้อผิดพลาด", "กรุณาเลือกไฟล์เสียง/วิดีโอ หรืออัดเสียงพูดเพื่อเพิ่มเข้าคิวก่อนเริ่มถอดความ")
             return
 
+        # Save settings via QSettings
+        self.settings.setValue("hf_token", self.hf_token_input.text().strip())
+        self.settings.setValue("use_diarization", "true" if self.diarization_cb.isChecked() else "false")
+
         # Disable all UI input during processing
         self.transcribe_btn.setEnabled(False)
         self.local_model_btn.setEnabled(False)
@@ -1008,6 +1111,8 @@ class MainWindow(QMainWindow):
         self.vad_combo.setEnabled(False)
         self.dtw_cb.setEnabled(False)
         self.prompt_input.setEnabled(False)
+        self.diarization_cb.setEnabled(False)
+        self.hf_token_input.setEnabled(False)
 
         self.current_queue_index = 0
         self.log_output.clear()
@@ -1037,6 +1142,8 @@ class MainWindow(QMainWindow):
         mode_index = self.vad_combo.currentIndex()
         use_dtw = self.dtw_cb.isChecked()
         initial_prompt = self.prompt_input.text().strip()
+        use_diarization = self.diarization_cb.isChecked()
+        hf_token = self.hf_token_input.text().strip()
 
         if not initial_prompt and language == 'ko':
             initial_prompt = "놀라운 토요일, 놀토, 받아쓰기, 받쓰, 신동엽, 붐, 문세윤, 박나래, 한해, 키, 태연, 피오, 넉살, 김동현, 입짧은햇님."
@@ -1051,7 +1158,9 @@ class MainWindow(QMainWindow):
             use_demucs=use_demucs,
             mode_index=mode_index,
             use_dtw=use_dtw,
-            initial_prompt=initial_prompt
+            initial_prompt=initial_prompt,
+            use_diarization=use_diarization,
+            hf_token=hf_token
         )
         self.worker.log_signal.connect(self.log_output.append)
         self.worker.progress.connect(self.progress_bar.setValue)
@@ -1151,6 +1260,8 @@ class MainWindow(QMainWindow):
         self.vad_combo.setEnabled(True)
         self.dtw_cb.setEnabled(True)
         self.prompt_input.setEnabled(True)
+        self.diarization_cb.setEnabled(True)
+        self.toggle_diarization_fields(self.diarization_cb.isChecked())
         
         self.export_srt_btn.setEnabled(True)
         self.export_txt_btn.setEnabled(True)
