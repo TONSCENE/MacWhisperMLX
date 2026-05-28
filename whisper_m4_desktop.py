@@ -15,6 +15,17 @@ if "packaged by" in sys.version:
     elif "|" in sys.version:
         sys.version = sys.version.replace("|", "")
 
+# Mark that the application is running to enable global compatibility patches in sitecustomize.py
+os.environ["MAC_WHISPER_RUNNING"] = "1"
+
+# Configure PYTHONPATH to load our global sitecustomize.py compatibility patch in all subprocesses
+if getattr(sys, 'frozen', False):
+    bundle_dir = sys._MEIPASS
+    os.environ["PYTHONPATH"] = bundle_dir + os.pathsep + os.environ.get("PYTHONPATH", "")
+else:
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    os.environ["PYTHONPATH"] = current_dir + os.pathsep + os.environ.get("PYTHONPATH", "")
+
 # Add bundled and common paths to system PATH so libraries can find ffmpeg and ffprobe
 extra_paths = ["/opt/homebrew/bin", "/usr/local/bin", "/opt/homebrew/sbin"]
 if getattr(sys, 'frozen', False):
