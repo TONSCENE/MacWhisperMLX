@@ -207,14 +207,48 @@ class TranscribeWorker(QThread):
                 self.log_signal.emit("🗣️ เริ่มการวิเคราะห์แยกผู้พูด (Pyannote Speaker Diarization)...")
                 try:
                     from pyannote.audio import Pipeline
+                    from pyannote.audio.core.plda import PLDA
+
+                    class MockPLDA(PLDA):
+                        def __init__(self):
+                            pass
+
+                    plda_dummy = MockPLDA()
+
+                    config = {
+                        'version': '3.1.0',
+                        'pipeline': {
+                            'name': 'pyannote.audio.pipelines.SpeakerDiarization',
+                            'params': {
+                                'clustering': 'AgglomerativeClustering',
+                                'embedding': 'pyannote/wespeaker-voxceleb-resnet34-LM',
+                                'embedding_batch_size': 32,
+                                'embedding_exclude_overlap': True,
+                                'segmentation': 'pyannote/segmentation-3.0',
+                                'segmentation_batch_size': 32,
+                                'plda': plda_dummy
+                            }
+                        },
+                        'params': {
+                            'clustering': {
+                                'method': 'centroid',
+                                'min_cluster_size': 12,
+                                'threshold': 0.7045654963945799
+                            },
+                            'segmentation': {
+                                'min_duration_off': 0.0
+                            }
+                        }
+                    }
+
                     token = self.hf_token.strip() if self.hf_token else None
                     if not token:
                         token = True
                     
                     self.log_signal.emit("   👉 กำลังโหลดโมเดล Pyannote (pyannote/speaker-diarization-3.1)...")
                     pipeline = Pipeline.from_pretrained(
-                        "pyannote/speaker-diarization-3.1",
-                        use_auth_token=token
+                        config,
+                        token=token
                     )
                     
                     try:
@@ -230,6 +264,9 @@ class TranscribeWorker(QThread):
                     self.log_signal.emit("   👉 กำลังประมวลผลแยกผู้พูด...")
                     diarization = pipeline(working_audio_file)
                     
+                    if hasattr(diarization, "speaker_diarization"):
+                        diarization = diarization.speaker_diarization
+
                     for turn, _, speaker in diarization.itertracks(yield_label=True):
                         diarization_list.append({
                             'start': turn.start,
