@@ -53,7 +53,7 @@ datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['/Users/chanthana/Desktop/whisper ในเครื่อง/Whisper/whisper_m4_desktop.py'],
+    ['whisper_m4_desktop.py'],
     pathex=['/Users/chanthana/miniforge3/lib'],
     binaries=binaries,
     datas=datas,
@@ -83,7 +83,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['/Users/chanthana/Desktop/whisper ในเครื่อง/Whisper/applet.icns'],
+    icon=['applet.icns'],
 )
 coll = COLLECT(
     exe,
@@ -97,6 +97,6 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='MacWhisperMLX.app',
-    icon='/Users/chanthana/Desktop/whisper ในเครื่อง/Whisper/applet.icns',
+    icon='applet.icns',
     bundle_identifier=None,
 )

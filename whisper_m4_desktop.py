@@ -106,11 +106,11 @@ class DragDropWidget(QLabel):
         self.setStyleSheet("""
             QLabel {
                 border: 2px dashed #444c56;
-                border-radius: 12px;
+                border-radius: 10px;
                 background-color: #22272e;
                 color: #adbac7;
-                font-size: 14px;
-                padding: 40px;
+                font-size: 12px;
+                padding: 20px;
             }
             QLabel:hover {
                 border-color: #539bf5;
@@ -513,8 +513,8 @@ class MainWindow(QMainWindow):
                 font-weight: bold;
                 border: 1px solid #444c56;
                 border-radius: 8px;
-                margin-top: 15px;
-                padding-top: 15px;
+                margin-top: 10px;
+                padding-top: 10px;
                 background-color: #22272e;
             }
             QGroupBox::title {
@@ -525,15 +525,15 @@ class MainWindow(QMainWindow):
                 color: #539bf5;
             }
             QLabel {
-                font-size: 13px;
+                font-size: 12px;
             }
             QComboBox, QLineEdit {
                 background-color: #2d333b;
                 border: 1px solid #444c56;
                 border-radius: 6px;
-                padding: 6px 12px;
+                padding: 4px 8px;
                 color: #adbac7;
-                font-size: 13px;
+                font-size: 12px;
             }
             QComboBox::drop-down {
                 border: 0px;
@@ -548,9 +548,9 @@ class MainWindow(QMainWindow):
                 color: white;
                 border: 1px solid #444c56;
                 border-radius: 6px;
-                padding: 8px 16px;
+                padding: 5px 12px;
                 font-weight: bold;
-                font-size: 13px;
+                font-size: 12px;
             }
             QPushButton:hover {
                 background-color: #4f8ce6;
@@ -589,17 +589,17 @@ class MainWindow(QMainWindow):
                 border-radius: 6px;
                 color: #adbac7;
                 font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-                font-size: 12px;
+                font-size: 11px;
             }
             QTableWidget {
                 background-color: #22272e;
                 border: 1px solid #444c56;
                 border-radius: 8px;
                 gridline-color: #444c56;
-                font-size: 13px;
+                font-size: 12px;
             }
             QTableWidget::item {
-                padding: 6px;
+                padding: 4px;
             }
             QTableWidget::item:selected {
                 background-color: #316dca;
@@ -608,9 +608,10 @@ class MainWindow(QMainWindow):
             QHeaderView::section {
                 background-color: #2d333b;
                 color: #adbac7;
-                padding: 6px;
+                padding: 4px;
                 border: 1px solid #444c56;
                 font-weight: bold;
+                font-size: 12px;
             }
         """)
 
@@ -632,18 +633,18 @@ class MainWindow(QMainWindow):
         left_widget = QWidget()
         left_widget.setObjectName("leftWidget")
         left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(10, 10, 10, 10)
+        left_layout.setContentsMargins(8, 8, 8, 8)
+        left_layout.setSpacing(6)
         left_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         
         # Title Label
         app_title = QLabel("🎙️ MacWhisper MLX")
-        app_title.setFont(QFont("System", 18, QFont.Weight.Bold))
-        app_title.setStyleSheet("color: #539bf5; margin-bottom: 5px;")
+        app_title.setFont(QFont("System", 16, QFont.Weight.Bold))
+        app_title.setStyleSheet("color: #539bf5; margin-bottom: 4px;")
         left_layout.addWidget(app_title)
 
         # Group 1: Configuration Settings
         config_group = QGroupBox("⚙️ การตั้งค่าประมวลผล (Config Settings)")
-        config_group.setMinimumHeight(450)
         config_layout = QVBoxLayout(config_group)
         config_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         
@@ -745,8 +746,9 @@ class MainWindow(QMainWindow):
 
         # Group 2: Recording Panel
         rec_group = QGroupBox("🔴 บันทึกเสียงพูดไมโครโฟน (Voice Recording)")
-        rec_group.setMinimumHeight(110)
         rec_layout = QVBoxLayout(rec_group)
+        rec_layout.setContentsMargins(8, 10, 8, 8)
+        rec_layout.setSpacing(6)
         rec_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         self.rec_status_lbl = QLabel("สถานะ: พร้อมบันทึก")
         rec_layout.addWidget(self.rec_status_lbl)
@@ -760,7 +762,6 @@ class MainWindow(QMainWindow):
 
         # Group 2.5: System Monitor Panel (CPU, RAM, GPU)
         perf_group = QGroupBox("📊 สถานะเครื่อง (System Resources)")
-        perf_group.setMinimumHeight(180)
         perf_layout = QVBoxLayout(perf_group)
         perf_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         perf_layout.setSpacing(6)
@@ -823,7 +824,7 @@ class MainWindow(QMainWindow):
 
         # Group 3: Process Button
         self.transcribe_btn = QPushButton("🚀 เริ่มถอดเสียง (Start Transcribing)")
-        self.transcribe_btn.setMinimumHeight(45)
+        self.transcribe_btn.setMinimumHeight(36)
         self.transcribe_btn.clicked.connect(self.start_transcription)
         left_layout.addWidget(self.transcribe_btn)
 
@@ -831,7 +832,7 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(QLabel("📝 บันทึกประมวลผล (Console Logs):"))
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
-        self.log_output.setMinimumHeight(150)
+        self.log_output.setMinimumHeight(100)
         left_layout.addWidget(self.log_output)
 
         left_widget.setLayout(left_layout)
@@ -841,7 +842,8 @@ class MainWindow(QMainWindow):
         # ----------------- RIGHT PANEL (Editor & Drag/Drop) -----------------
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(10, 10, 10, 10)
+        right_layout.setContentsMargins(8, 8, 8, 8)
+        right_layout.setSpacing(6)
 
         # Drag and Drop Widget
         self.drop_widget = DragDropWidget()
@@ -914,8 +916,8 @@ class MainWindow(QMainWindow):
         right_widget.setLayout(right_layout)
         splitter.addWidget(right_widget)
         
-        # Adjust initial sizes (Left Panel 35%, Right Panel 65%)
-        splitter.setSizes([350, 750])
+        # Adjust initial sizes (Left Panel 28%, Right Panel 72%)
+        splitter.setSizes([300, 800])
 
         # Load settings via QSettings
         self.settings = QSettings("MacWhisperMLX", "Studio")
